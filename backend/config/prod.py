@@ -18,9 +18,9 @@ class LogConf:
     LOGLEVEL = "INFO"
 
 class SyncDir:
-    # BASEABSPATH = "/home/sssbjlx205/Documents/workspace/Node-red/validation-tool/task/flask-vue-crud/server/tasks" # 共享同步目录的绝对路径
-    BASEABSPATH = "/usr/src/app/tasks"
-    BASETASKPATH = BASEABSPATH + "/tasks" # 该目录下存储的都是task 的报告，以task_name 为区分,遍历这个文件夹，找到所有的报告文件
+    BASE_ABS_PATH = "/usr/src/app" # 共享同步目录的绝对路径
+    BASE_TASK_PATH = BASE_ABS_PATH + "/tasks" # 该目录下存储的都是task 的报告，以task_name 为区分
+    BASE_WARM_PATH = BASE_ABS_PATH + "/warms"  # 该目录下存储的都是warms 的报告，以task_name 为区分
 
 class ProductionConfig(DbConf,LogConf,SyncDir):
     pass

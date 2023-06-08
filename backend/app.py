@@ -22,9 +22,11 @@ org = config.settings.APP_ENV.ORG
 # Create InfluxDB client object
 client = InfluxDBClient(url=url, token=token, org=org)
 
-report_dir = config.settings.APP_ENV.BASETASKPATH
+sync_base_dir = config.settings.APP_ENV.BASE_ABS_PATH
+warm_dir = config.settings.APP_ENV.BASE_WARM_PATH
+report_dir = config.settings.APP_ENV.BASE_TASK_PATH
 
-# 上传并解压
+# sync_folder / report 上传并解压
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST':
@@ -41,12 +43,12 @@ def upload():
                 zf.extract(file, base_path + "/" + stem)  # 解压至指定目录
     return 'Uploaded!!!!'
 
-
+#
 @app.route('/download/<report_name>', methods=['POST'])
 def download(report_name):
     # file = report_dir + '/'+report_name + '/' + report_name + '.zip'
-    file = report_dir + '/test.zip'
-    print("report_naem: {}".format(file))
+    file = report_dir + '/' + report_name
+    print("download report_naem: {}".format(file))
     file_size = os.path.getsize(file)
     print(file_size)
     response = send_file(file,
@@ -70,17 +72,23 @@ def downloads(path):
     '''
     # 指定可供下载的大目录
     print("--start downloads----: {}".format(path))
-    root = report_dir
+    # root = report_dir
 
-    root = root + '/' + path[:-4]
+    # root = root + '/' + path
+    file = sync_base_dir +'/test.mp4'
+    # root = sync_base_dir + "/warms"
     # as_attachment参数设置为False，会展示预览，例如图片或pdf
     # send_from_directory(root, path, as_attachment=False)
     # return "download"
-    return send_from_directory(root, path, as_attachment=False)
+    print("download -- {}".format(file))
+    response = send_file(file,
+                         mimetype='application/zip',
+                         attachment_filename=os.path.basename(file),
+                         as_attachment=True)
+    # return send_from_directory(root, path, as_attachment=False)
 
-
-@app.route('/table/list', methods=['GET'])
-def all_tables():
+@app.route('/task/list', methods=['GET'])
+def get_task_list():
     tasks = all_task()
     # print(type(tasks))
     data = {
@@ -88,6 +96,61 @@ def all_tables():
         "data": tasks
     }
     return data
+
+
+@app.route('/task', methods=['GET'])
+def get_task_detail_by_name():
+    task_name = request.args.get('task_name')
+
+    print("get_task_detail, task_name : {}".format(task_name))
+    data = get_task_by_name(task_name)
+    print(data)
+    result = {
+        'code': 20000,
+        'data': data
+    }
+    return result
+
+# get_task_by_id get taskName
+def get_task_by_name(task_name):
+    data = all_task()
+    # print("data : {}".format(data))
+    single_task = {}
+    if data.__len__() > 0:
+        for task in data:
+            if task['task_name'] == task_name:
+                single_task = task
+                break
+    # 获取到了task Object，就根据task_name ,获取report
+    if single_task != {}:
+        report = get_task_report(task_name)
+        single_task.setdefault('report',report)
+    return single_task
+
+
+@app.route('/task/detail/<task_id>', methods=['GET'])
+def get_task_detail(task_id):
+    print("get_task_detail, task_id : {}".format(task_id))
+    data = get_task_by_id(int(task_id))
+    print(data)
+    result = {
+        'code': 20000,
+        'data': data
+    }
+    return result
+
+# get_task_by_id get taskName
+def get_task_by_id(task_id):
+    data = all_task()
+    single_task = {}
+    if data.__len__() > task_id:
+        single_task = data[task_id]
+        task_name = single_task.get('task_name')
+        print("get_task{}".format(task_name))
+        report = get_task_report(task_name)
+        single_task.setdefault('report',report)
+    return single_task
+
 
 @app.route('/report/list', methods=['GET'])
 def all_reports_dir():
@@ -99,33 +162,6 @@ def all_reports_dir():
     }
     return data
 
-
-@app.route('/table/detail/<task_id>', methods=['GET'])
-def get_task_detail(task_id):
-    # data = {'id': 'cf289978b41c453989c5cae59e314873', 'title': 'the Road', 'author': 'Jack Kerouac', 'read': True, 'task_name': 'tasssk-26', 'time': '1998-05-29T17:57:48.920000+00:00', 'start_time': '2023-05-29T17:51:28.270000+00:00', 'end_time': '2023-05-30T08:00:25.146642+00:00', 'description': 'validatin test task ', 'directory': 'task', 'type': 'Raspberry', 'version': '33'}
-    print(task_id)
-    data = get_task_by_id(int(task_id))
-    print(data)
-    result = {
-        'code': 20000,
-        'data': data
-    }
-    return result
-
-def get_task_by_id(task_id):
-
-    data = all_task()
-    single_task = {}
-    if data.__len__() > task_id:
-        single_task = data[task_id]
-        print(single_task.get('task_name'))
-        # TODO  这个地方应该是根据task_name 获取report list
-        report = get_task_report('test')
-        single_task.setdefault('report',report)
-    return single_task
-
-
-@app.route('/tasks', methods=['GET'])
 def all_task():
     # query = 'from(bucket: "sdc_task_01") |> range(start: -1h)'
     query = 'from(bucket: "sdc_task_01") |> range(start: 2023-05-20T17:51:28.270Z)'
@@ -204,9 +240,11 @@ def all_report_name():
     print(folders)
     return folders
 
+# 获取sync_folder 下面tasks 中的报告
 def all_report():
     folder = report_dir
-    print(folder)
+    print("\n-------------files end-------------------------\n")
+    print("sync folder tasks : {}".format(folder))
     json_obj = {}
     task_list = []
     for root, dirs, files in os.walk(folder):
@@ -299,7 +337,8 @@ def show_photo():
 #get方法:预览html
 @app.route('/showhtml', methods=['GET'])
 def show_html():
-    filename = request.values.get('filename')
+    # filename = request.values.get('filename')
+    filename = 'test.html'
     file_dir=os.path.join(os.getcwd()+'/sync_folder',filename)
     if request.method == 'GET':
         if filename is None:
